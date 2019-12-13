@@ -30,7 +30,7 @@ class Sim:
 
     def update_body_list(self):
         for idx, b in enumerate(self.bodies):
-            b.update_pos(step, np.delete(self.bodies, idx))
+            b.update_pos(self.step, np.delete(self.bodies, idx))
         return self.bodies
     
     def calc_COM(self):
@@ -88,6 +88,9 @@ class Sim:
         Writer = animation.writers['imagemagick']
         writer = Writer(fps=15, metadata=dict(artist=artist), bitrate=1800)
         self.ani.save(name+'.gif', writer=writer)
+
+    def show(self):
+        return plt.show()
 
 def grav_force(m1, m2, r1, r2):
     dist = r2-r1
@@ -211,16 +214,3 @@ sys4 = np.array([
 
 
 
-if __name__=="__main__":
-
-    step = 60*60
-    time = 60*60*24*5
-    speed_multiplier = 160
-
-    sim = Sim(step, time, speed_multiplier, earth_sun_sys)
-
-
-    sim.animate()
-    sim.save_gif("testgif")
-
-    plt.show()

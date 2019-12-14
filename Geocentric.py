@@ -17,12 +17,13 @@ crashed = False
 
 
 class Sim:
-    def __init__(self, step, time, speed_multiplier, bodies=[]):
+    def __init__(self, step, time, speed_multiplier, bodies=[], rotate=True):
         # Forces should be array of lambda
         self.step = step
         self.time = time
         self.speed_multiplier = speed_multiplier
         self.bodies = bodies
+        self.rotate = rotate
 
     def init_bodies(bodies):
         self.bodies = bodies
@@ -55,8 +56,8 @@ class Sim:
         comx, comy, comz = self.calc_COM()
         self.com_graph._offsets3d = ([comx],[comy],[comz])
         self.title.set_text('N-Body Sim, time={}'.format(i))
-
-        self.ax.view_init(elev=20., azim=0.5*i)
+        if self.rotate:
+            self.ax.view_init(elev=20., azim=0.5*i)
 
     def animate(self):
         bodies = self.bodies
@@ -65,8 +66,8 @@ class Sim:
         speed_multiplier = self.speed_multiplier
 
         xlim=(-earth_sun_d, earth_sun_d)
-        ylim=xlim
-        zlim=xlim
+        ylim=zlim=xlim
+
 
         self.fig = plt.figure()
         self.ax = self.fig.add_subplot(111, projection='3d', 
@@ -97,11 +98,41 @@ def grav_force(m1, m2, r1, r2):
     distMag = np.sqrt(dist.dot(dist))
     return (G*m1*m2/distMag**3)*dist
 
+def grav_force_const(m, r):
+    return [0.0, 0.0, -9.81*m]
+
+
+class Force:
+    def __init__(self, expr, distributed):
+        self.expr = expr
+        self.distributed = distributed
+
+    def apply_force(self, body, others):
+        global crashed
+        F = np.array([0,0,0])
+        if self.distributed:
+            for other in others:
+                F = F + self.expr(body.mass, other.mass, body.pos, other.pos) 
+
+                dist = other.pos-body.pos
+                distMag = np.sqrt(dist.dot(dist))
+                if distMag < 1e10:
+                    F = 0.0
+                    if not crashed:
+                        print("Crash!")
+                        crashed = True
+        else:
+            F = F + self.expr(body.mass, body.pos) 
+        return F
+
+Gravity = Force(grav_force, True)
+Gravity_const = Force(grav_force_const, False)
+
 
 
 
 class Body:
-    def __init__(self, mass, pos, vel, forces=[grav_force]):
+    def __init__(self, mass, pos, vel, forces=[Gravity]):
         x, y, z = pos
         vx, vy, vz = vel
         self.mass = mass
@@ -114,17 +145,8 @@ class Body:
     def update_F(self, others):
         global crashed
         F = np.array([0,0,0])
-        for other in others:
-            for force in self.forces:
-                F = F + force(self.mass, other.mass, self.pos, other.pos) 
-
-            dist = other.pos-self.pos
-            distMag = np.sqrt(dist.dot(dist))
-            if distMag < 1e10:
-                F = 0.0
-                if not crashed:
-                    print("Crash!")
-                    crashed = True
+        for force in self.forces:
+            F = F + force.apply_force(self,others) 
         self.F = F
         return self.F
 
@@ -165,7 +187,7 @@ sys2 = np.array([
 
     Body(sun_m,
         (0.0, 0.0, 0.0),
-        (0.0, 0.0, 0.2*earth_iv)
+        (0.0, 0.0, 0.0)#0.2*earth_iv)
         ), 
     Body(earth_m,
         (earth_sun_d, 0.0, 0.0), 
@@ -203,6 +225,17 @@ sys4 = np.array([
         (-4*earth_sun_d, -2*earth_sun_d, 0.0),
         (0.0, 0.0, 0.0)
         ) 
+    ])
+
+falling_balls = np.array([
+    Body(2,
+        (0.0, 0.0, 0.0),
+        (0.0, 0.0, 0.0), 
+        [Gravity_const]),
+    Body(5,
+        (0.0, 0.0, 0.0),
+        (10.0, 0.0, 0.0), 
+        [Gravity_const])
     ])
 
 
